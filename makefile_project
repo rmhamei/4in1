@@ -1,0 +1,74 @@
+################################################################################
+# Automatically-generated file. Do not edit!
+################################################################################
+SHELL = /bin/bash
+
+-include ../makefile.init
+
+RM := rm
+
+USER_OBJS :=
+OUTTARGET := libnetstar_modeler_wdmsimprocess.so
+PROJECTNAME := netstar_modeler_wdmsimprocess
+
+# All of the sources participating in the build are defined here
+DIR_INC := -I../../../code/inc -I../../inc -I../.. -I./
+DIR_SRC := ../../src/$(PROJECTNAME)
+DIR_DEPS_INC := -I../../../deps/linux/Release/inc -I../../../deps/linux/Release
+DIR_DEPS_DLL := -L../../../deps/linux/Release/dll -L../../../output/linux/Release/dll
+
+AllDirs := $(shell ls $(DIR_SRC) -R | grep '^\$(DIR_SRC).*:$$' | awk '{gsub(":","");print}')
+Sources := $(foreach n,$(AllDirs) , $(wildcard $(n)/*.cpp))
+OBJECTS := $(patsubst %.cpp,%.o, $(Sources))
+OSOBJECTS := $(patsubst %.cpp,%, $(Sources))
+TARGETS := $(patsubst %.cpp,%.d, $(Sources))
+
+LIBS := -lboost_system \
+ -lboost_filesystem \
+ -lboost_thread \
+ -lboost_locale \
+ -lboost_serialization \
+ -lboost_wserialization \
+ -lmds_asonif \
+ -lutask \
+ -lnetstar_typeconvert \
+ -lnetstar_filefunction \
+ -lnetstar_modeler_log \
+ -lnetstar_modeler_datamgr \
+ -lsecurec
+
+#ccache
+CXX = ccache g++
+#-I/root/model/dotask_cpp
+CXXFLAGS = $(DIR_INC) $(DIR_DEPS_INC) -I${JAVA_HOME}/include/ -I${JAVA_HOME}/include/linux/ -fPIC -shared -O3 -fmessage-length=0 -fPIC -fstack-protector
+
+all: $(OBJECTS)
+	@echo 'Invoking: GCC C++ Linker'
+	$(CXX) -o $(OUTTARGET) $(DIR_DEPS_DLL) -shared  -Wl,-z,relro -Wl,--disable-new-dtags,--rpath,/libpath1:/libpath2 -Wl,-z,noexecstack  $(OBJECTS) $(USER_OBJS) $(LIBS) 
+	@echo 'Finished building target: $@'
+	@echo ' '
+	$(MAKE) --no-print-directory post-build
+
+target: $(OBJECTS)
+	@for obj in $(OBJECTS); \
+	do                        \
+	$(CXX) $(CXXFLAGS) -o $$obj $$obj.cpp; \
+	done	
+	
+clean:	
+	-rm -f $(TARGETS) $(OBJECTS) $(OSOBJECTS) $(OUTTARGET)
+
+post-build:
+	-mkdir -p ../../../output/linux/Release/dll
+	-mkdir -p ../../../output/linux/Release/inc
+	-mkdir -p ../../../output/linux/Release/lib
+	-cp $(OUTTARGET) ../../../output/linux/Release/dll/
+	-cp -rp ../../../code/inc/$(PROJECTNAME) ../../../output/linux/Release/inc/
+	-@echo ' '
+
+.PHONY: all clean dependents
+.SECONDARY: post-build
+
+-include ../makefile.targets
+
+ 
