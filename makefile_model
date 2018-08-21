@@ -1,0 +1,11 @@
+编译		
+g++ -g -I${JAVA_HOME}/include -I${JAVA_HOME}/include/linux -L${JRE_HOME}/lib/amd64/server model_cpp.cpp -ljvm
+执行
+./a.out
+
+编译
+g++ -I${JAVA_HOME}/include/ -I${JAVA_HOME}/include/linux/ -I/root/model/dotask_cpp -fPIC -shared -o libDotask_cpp.so Dotask_cpp.cpp
+执行
+export LD_LIBRARY_PATH="/root/model/dotask_cpp":$LD_LIBRARY_PATH
+java -cp fourinone.jar: StartWorker 10.162.212.236 2008
+java -cp fourinone.jar: StartWorker 10.162.212.236 2009
