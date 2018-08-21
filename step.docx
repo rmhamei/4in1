@@ -1,0 +1,26 @@
+程序步骤	需要准备的文件	机器IP
+创建jvm虚拟环境	C++总体工程	机器X
+10.162.212.236
+路径：/root/model/ctor
+启动CacheServer	一个Java class（IP端口信息在代码中配置） 	10.162.212.177:2000, 10.162.212.177:2001
+路径：/root/model
+启动ParkServer	一个Java class，以及对应的config文件	10.162.203.95:1888，10.162.203.95:1889
+路径：/root/zhangxilai/model
+启动CacheFacadeServer	一个Java class，以及对应的config文件	10.162.235.205:1998，
+//10.162.235.205:1999
+路径：/root/model
+启动Worker*2	一个Java class	10.162.212.236:2008，10.162.212.236:2009
+路径：/root/model
+一个机器上两个实例，端口号需要在启动class程序时手动输入
+Ctor	创建模拟数据WordCount	一个C++总体工程，一个C++ doTask程序，一个Java jar包实现Ctor，被C++总体工程调用。
+WORKER计算函数代码在路径/root/model/dotask_cpp	机器X
+10.162.212.236
+路径：/root/model/ctor
+	将data传入cache得到key[]		
+	分配任务，并将对应key传给对应worker		
+	得到worker计算结果，统计并保存进cache。		
+（验证）从cache取出结果，并输出显示，检验功能是否正常	在Java jar包内实现。	机器X
+10.162.212.23
+销毁JVM，释放资源	C++总体工程	机器X
+10.162.212.23
+
