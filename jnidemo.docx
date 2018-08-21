@@ -1,0 +1,42 @@
+	if (status != JNI_ERR) {
+		printf("create java jvm success\n");
+		cls = env->FindClass("com/test/MyTest");  // 在这里查找ava类
+		if (cls != 0) {
+			printf("find java class success\n");
+			// 构造函数
+			mid = env->GetMethodID(cls, "<init>", "()V");
+			if (mid != 0) {
+				jobj = env->NewObject(cls, mid);
+				std::cout << "init ok" << std::endl;
+			}
+
+			// 调用add函数
+			mid = env->GetStaticMethodID(cls, "add", "(II)I");
+			if (mid != 0) {
+				square = env->CallStaticIntMethod(cls, mid, 5, 5);
+				std::cout << square << std::endl;
+			}
+
+
+
+
+			// 调用judge函数
+			mid = env->GetMethodID(cls, "judge", "(Z)Z");
+			if (mid != 0) {
+				jnot = env->CallBooleanMethod(jobj, mid, 1);
+				if (!jnot) std::cout << "Boolean ok" << std::endl;
+
+			}
+		}
+		else {
+			fprintf(stderr, "FindClass failed\n");
+		}
+
+		jvm->DestroyJavaVM();
+		fprintf(stdout, "Java VM destory.\n");
+		return 0;
+	}
+	else {
+		printf("create java jvm fail\n");
+		return -1;
+	}
