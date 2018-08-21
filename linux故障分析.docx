@@ -1,0 +1,216 @@
+	///////////////////////////////////////////////////////////////////////////////
+	// Function       : do_mp_survial
+	// Description    : Linux故障模拟
+	// Input          : const ObjectIDType ason_domain_id
+	// Input          : const MDS_Report_SubProcess::MOSimBuffer& modata
+	// Output         : std::list<MDSWDMMPTaskData>& lst_task_data
+	// Output         : std::list<MDSWDMReportResultData>& lst_mpreportdata
+	// Return         : 
+	// Others         : 
+	// History        : 
+	//   1. Date      : 2016-06-28
+	//      Author    : 
+	//      Mod       : 
+	//   2. ...
+	///////////////////////////////////////////////////////////////////////////////
+	ErrorCode netstar_mp_survial_mgr::do_mp_survial(std::list<sim_bulk_return>& lst_task_retcode,
+		sim_task_progress_data& progress_data,
+		const MDSWDMMPMainData& main_data, const MDS_Report_SubProcess::MOSimBuffer& modata,
+		const std::vector<netstar_fault_flag_obj>& vec_fault_flag_obj)
+	{
+		lst_task_retcode.clear();
+
+		ErrorCode ret = RETCODE_SUCCESS;
+
+		m_task_data = get_task_data();
+		in_data.mainalldata = main_data;
+		in_data.modata = modata;
+		in_data.task_data = m_task_data;
+
+		// 进程数量
+		long MaxProcNum = netstar_modeler_config::Instance()->get_max_use_core_num();
+		long ProcNum = sysconf(_SC_NPROCESSORS_ONLN) * 0.75;
+		ProcNum = ProcNum > MaxProcNum ? MaxProcNum : ProcNum;
+		NP_MODELER_TRACE_LOG("MaxProcNum: %d, CoreNum: %d, SubProcNum: %d",
+			MaxProcNum, sysconf(_SC_NPROCESSORS_ONLN), ProcNum);
+
+		// 获取任务数
+		int groupNum = ZERO;
+		int oneFaultNum = ZERO;
+		int totalGroupNum = ZERO;
+		int scatteredFaultNum = ZERO;
+		get_task_num(totalGroupNum, groupNum, oneFaultNum, scatteredFaultNum, ProcNum, vec_fault_flag_obj.size());
+		progress_data.m_per_progress = (progress_data.m_max_progress - progress_data.m_curr_progress) / totalGroupNum;
+		NP_MODELER_TRACE_LOG("FaultComNum: %d, TotalGroupNum: %d, faultNum of one group: %d, scatteredFaultNum: %d",
+			vec_fault_flag_obj.size(), totalGroupNum, oneFaultNum, scatteredFaultNum);
+
+		NP_MODELER_TRACE_LOG("ltask do_mp_survial start");
+
+		// 开启任务
+		task_out_data out_data;
+		out_data.task_progress_data = &progress_data;
+
+		WDM_ASSERT_RETFAIL(simulation_result_handle::Instance()->start_task(TWO));
+		NP_MODELER_TRACE_LOG("begin batch call ltask......");
+
+		// 初始化client属性
+		LtcHdl *clientHandle;
+		LtcAttr client;
+		memset_s(&client, sizeof(LtcAttr), 0, sizeof(LtcAttr));
+		std::string cfg_path = NetStar_Common::GetEnvValue("APP_ROOT").append(LITE_TASK_CFG);
+		client.cfgPath = const_cast<char*>(cfg_path.c_str());
+		client.clientHook = lTaskCallback;
+		client.usrCtx = (void *)(&out_data);
+		client.disableExec = 1;
+
+		// client init
+		ret = H_LtInit(&client, &clientHandle);
+		if (LT_OK != ret)
+		{
+			NP_MODELER_ERROR_LOG("do_mp_survial H_LtInit failed, retCode %d", ret);
+			return RETCODE_FAILURE;
+		}
+
+		// 数据序列化
+		std::string Indata_str;
+		write_boost_serialize(in_data, Indata_str);
+
+		// 写入共享内存
+		char *in_main_data = const_cast<char *>(Indata_str.c_str());
+		std::string g_id = NetStar_Common::ulNum2Str(H_LtGidGet());
+		char *in_id_main_data = const_cast<char *>(g_id.c_str());
+		ret = H_LtKvSet(const_cast<char *>(g_id.c_str()), strlen(in_id_main_data) + 1, in_main_data, strlen(in_main_data) + 1);
+		if (LT_OK != ret)
+		{
+			NP_MODELER_ERROR_LOG("do_mp_survial H_LtKvSet in_id_main_data failed: %d", ret);
+			return RETCODE_FAILURE;
+		}
+		m_lst_utaskshm_id.push_back(in_id_main_data);
+
+		// 初始化job属性
+		LtJob job;
+		memset_s(&job, sizeof(LtJob), 0, sizeof(LtJob));
+		job.jobType = SINGLE_TASK;
+		memset_s(job.xRun.xLib, LT_CHAR_LEN, 0, LT_CHAR_LEN);
+		std::string lib_path = NetStar_Common::GetEnvValue("APP_ROOT").append(WDM_SIM_PROCESS_SO);
+		strcpy_s(job.xRun.xLib, LT_CHAR_LEN, "/opt/litetask/bin/libnetstar_modeler_wdmsimprocess.so");
+		NP_MODELER_ERROR_LOG("/opt/litetask/bin/libnetstar_modeler_wdmsimprocess.so");
+		memset_s(job.xRun.xEntry, LT_CHAR_LEN, 0, LT_CHAR_LEN);
+		strcpy_s(job.xRun.xEntry, LT_CHAR_LEN, "do_survival");
+		job.jHook = lTaskCallback;
+		job.jHookArg = (void *)(&out_data);
+
+		// creat job
+		ret = H_LtCreateJob(clientHandle, &job);
+		if (LT_OK != ret)
+		{
+			H_LtFini(&clientHandle);
+			NP_MODELER_ERROR_LOG("do_mp_survial H_LtCreateJob failed: %d", ret);
+			return RETCODE_FAILURE;
+		}
+
+		std::vector<netstar_fault_flag_obj> oneFaultCom;
+		std::vector<netstar_fault_flag_obj>::const_iterator faultIter = vec_fault_flag_obj.begin();
+
+		for (int i = 0; i < totalGroupNum; ++i)
+		{
+			//故障分组
+			oneFaultCom.clear();
+			if (i < groupNum)
+			{
+				oneFaultCom.insert(oneFaultCom.end(), faultIter, faultIter + oneFaultNum);
+				faultIter += oneFaultNum;
+
+				// 若是按照并发数来分配的组合,则将零散组合分到各组，分完为止
+				if (totalGroupNum == groupNum && i < scatteredFaultNum)
+				{
+					oneFaultCom.insert(oneFaultCom.end(), *faultIter);
+					faultIter++;
+				}
+			}
+			else
+			{
+				// 若是按照限制数来分配的组合,则直接将零散组合分配到最后一组
+				oneFaultCom.insert(oneFaultCom.end(), faultIter, faultIter + scatteredFaultNum);
+				faultIter += scatteredFaultNum;
+			}
+
+			//故障数据序列化
+			fault_in_data tFaultCom;
+			tFaultCom.oneFaultCom = oneFaultCom;
+			Indata_str.clear();
+			write_boost_serialize(tFaultCom, Indata_str);
+
+			//写入共享内存
+			char *in_fault = const_cast<char *>(Indata_str.c_str());
+			std::string g_fault_id = NetStar_Common::ulNum2Str(H_LtGidGet());
+			char *in_id_fault = const_cast<char *>(g_fault_id.c_str());
+			ret = H_LtKvSet(const_cast<char *>(g_fault_id.c_str()), strlen(in_id_fault) + 1, in_fault, strlen(in_fault) + 1);
+			if (LT_OK != ret)
+			{
+				H_LtFini(&clientHandle);
+				NP_MODELER_ERROR_LOG("do_mp_survial H_LtKvSet in_id_fault failed: %d", ret);
+				break;
+			}
+			m_lst_jobshm_id.push_back(in_id_fault);
+
+			//所有数据的编号序列化
+			survival_in_data tsurvival_in_data;
+			tsurvival_in_data.pair_in_data = std::make_pair(std::string(in_id_main_data), std::string(in_id_fault));
+			Indata_str.clear();
+			write_boost_serialize(tsurvival_in_data, Indata_str);
+			char *in_data = const_cast<char *>(Indata_str.c_str());
+			std::string g_in_id = NetStar_Common::ulNum2Str(H_LtGidGet());
+			char *in_id = const_cast<char *>(g_in_id.c_str());
+			ret = H_LtKvSet(const_cast<char *>(g_in_id.c_str()), strlen(in_id) + 1, in_data, strlen(in_data) + 1);
+			if (LT_OK != ret)
+			{
+				H_LtFini(&clientHandle);
+				NP_MODELER_ERROR_LOG("do_mp_survial H_LtKvSet in_id failed: %d", ret);
+				break;
+			}
+			m_lst_jobshm_id.push_back(in_id);
+
+			// 初始化task属性
+			LtTask task;
+			memset_s(&task, sizeof(LtTask), 0, sizeof(LtTask));
+			task.taskArg.dataAddr = in_id;
+			task.taskArg.dataLen = strlen(in_id) + 1;
+			ret = H_LtSubmitTask(clientHandle, job.jobID, &task);
+			NP_MODELER_ERROR_LOG("ltask do_mp_survial end create task %d, return: %d", i+1, ret);
+			if (LT_OK != ret)
+			{
+				H_LtFini(&clientHandle);;
+				NP_MODELER_ERROR_LOG("H_LtSubmitTask failed, retcode: %d", ret);
+				return RETCODE_FAILURE;
+			}
+
+		}
+		NP_MODELER_ERROR_LOG("ltask do_mp_survial start job");
+		ret = H_LtWaitJob(clientHandle, job.jobID, 0);
+		NP_MODELER_ERROR_LOG("ltask do_mp_survial end job");
+		if (LT_OK != ret)
+		{
+			H_LtFini(&clientHandle);
+			NP_MODELER_ERROR_LOG("H_LtWaitJob failed, retcode: %d", ret);
+			return RETCODE_FAILURE;
+		}
+		freeLtaskShm();
+
+		freeClientShm();
+		ret = H_LtFini(&clientHandle);
+		if (LT_OK != ret)
+		{
+			NP_MODELER_ERROR_LOG("H_LtFini failed, retcode: %d", ret);
+			return RETCODE_FAILURE;
+		}
+
+
+		//返回子进程分析数据结果
+		lst_task_retcode.push_back(out_data.task_return);
+
+		NP_MODELER_TRACE_LOG("ltask do_mp_survial end");
+
+		return ret;
+	}
+}
