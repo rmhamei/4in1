@@ -1,0 +1,313 @@
+Linux故障模拟
+函数：
+	ErrorCode netstar_mp_survial_mgr::do_mp_survial(std::list<sim_bulk_return>& lst_task_retcode, sim_task_progress_data& progress_data,const MDSWDMMPMainData& main_data, const MDS_Report_SubProcess::MOSimBuffer& modata,const std::vector<netstar_fault_flag_obj>& vec_fault_flag_obj)
+参数含义：
+lst_task_retcode
+progress_data
+main_data
+modata
+vec_fault_flag_obj
+返回：
+ErrorCode
+
+在c++中，: : 代表的含义：
+（1）表示“域操作符”
+例：声明了一个类A，类A里声明了一个成员函数void f()，但没有在类的声明里给出f的定义，那么在类外定义f时，
+就要写成void A::f()，表示这个f()函数是类A的成员函数。
+（2）直接用在全局函数前，表示是全局函数
+例：在VC里，你可以在调用API 函数里，在API函数名前加：：
+（3）表示引用成员函数及变量，作用域成员运算符
+例：System::Math::Sqrt() 相当于System.Math.Sqrt()
+:: 一般还有一种用法，就是直接用在全局函数前，表示是全局函数。当类的成员函数跟类外的一个全局函数同名时，在类内定义的时候，打此函数名默认调用的是本身的成员函数；如果要调用同名的全局函数时，就必须打上::以示区别。比如在VC里，你可以在调用API函数时，在API函数名前加::。
+
+如何新建一个C++工程？
+Windows：
+“File”-》“New”-》“Project”，选择visual c++，在右侧选择“Win32 console application”，输入一个项目名称，next，application settings选择console application，勾选empty project。在左侧工具栏找到solution explorer（view->solution explorer），在源文件（Source files）上右键，“add”-》“New Item”-》“C++ File”-》输入名称，路径默认-》Add。
+编写程序，“build”-》“build Solution”（或F7），“debug-》start without debugging”（或ctrl+F5）。
+Linux：
+新建Hello World.cpp，在终端进入到cpp所在目录下，输入
+g++ -std=c++11 –o HelloWorld HelloWorld.cpp
+然后输入命令运行程序：
+./HelloWorld
+
+Intellij IDEA中生成jar包
+File-》Project Structure，弹出Project Structure设置对话框；选择左边Artfacts后点击上方+按钮；在弹出的框中选择jar-》from modules with dependencies；选择要启动的类，确定；Build-》Build Artifacts-》build或者Rebuild，生成的jar文件位于out/artifacts下。
+
+JNI_VERSION_1_7为什么报错？
+vm_args.version = JNI_VERSION_1_6；这个参数应当注意，到底version是1_几，要看jni.h头文件中定义的值是多少。
+
+实现C++调用Java项目的步骤：
+1.	编写Java类及类方法，将选定的类导出jar包；
+2.	创建C++ Win32应用工程，不选择empty project而选默认值，将jar包、JDK安装目录下的jni.h和jni_md.h拷贝到C++工程目录下。在头文件中创建方法，在cpp中具体实现；
+3.	创建虚拟机、找到Java的jar包，读出class、分配Java对象（obj）并获取Java方法ID、根据obj和id获取Java方法返回值（如何传入参数？？答：找到Java工程下的class路径，输入javap –s class名，可以查看class中所有方法的参数表示Signature）、将返回值转换为C++的类型、释放动态库资源，详见http://3ms.huawei.com/km/blogs/details/5258209
+4.	int main(void){	cpp_Java c;	int i = c.Call_Java_Method();	return 0;	}
+5.	ctrl+f7；ctrl+f5。
+ 
+
+C++ VS的注释快捷键：
+注释：先Ctrl+K，再Ctrl+C；
+取消注释：先Ctrl+K，再Ctrl+U
+
+如何在Java工程中添加jar包？
+File->Project Structure；Moules->Dependencies->”+”->Jars or directories->选择jar包->Apply OK。
+
+std::string 转换为 const* char，方式如下：
+std::string str;
+const char * c = str.c_str();
+
+string如何转换为int或double？
+double n = atof(s.c_str());
+int n = atoi(s.c_str());
+
+查找接口的实现（快捷键）：
+Idea：ctrl+alt+B
+Eclipse：ctrl+T
+
+如何查看linux服务器的系统CPU核数？
+# 总核数 = 物理CPU个数 X 每颗物理CPU的核数 
+# 总逻辑CPU数 = 物理CPU个数 X 每颗物理CPU的核数 X 超线程数
+# 查看物理CPU个数
+cat /proc/cpuinfo| grep "physical id"| sort| uniq| wc -l
+# 查看每个物理CPU中core的个数(即核数)
+cat /proc/cpuinfo| grep "cpu cores"| uniq
+# 查看逻辑CPU的个数
+cat /proc/cpuinfo| grep "processor"| wc –l
+
+关于压力测试总是报错，报错日志如下：
+#
+# There is insufficient memory for the Java Runtime Environment to continue.
+# Native memory allocation (mmap) failed to map 65536 bytes for committing reserved memory.
+# Possible reasons:
+#   The system is out of physical RAM or swap space
+#   In 32 bit mode, the process size limit was hit
+# Possible solutions:
+#   Reduce memory load on the system
+#   Increase physical memory or swap space
+#   Check if swap backing store is full
+#   Use 64 bit Java on a 64 bit OS（已经是在64位操作系统上使用64位Java）
+#   Decrease Java heap size (-Xmx/-Xms)
+#   Decrease number of Java threads
+#   Decrease Java thread stack sizes (-Xss)
+#   Set larger code cache with -XX:ReservedCodeCacheSize=
+# This output file may be truncated or incomplete.
+#
+#  Out of Memory Error (os_linux.cpp:2627), pid=122911, tid=139992117733120
+#
+# JRE version: Java(TM) SE Runtime Environment (8.0_73-b02) (build 1.8.0_73-b02)
+# Java VM: Java HotSpot(TM) 64-Bit Server VM (25.73-b02 mixed mode linux-amd64 compressed oops)
+# Core dump written. Default location: /root/zhangxilai/wordCount/core or core.122911
+#
+
+Java工程如何调用C++工程代码？
+答：http://3ms.huawei.com/km/blogs/details/5258209
+
+在Linux平台下如何编译一个C++工程？
+安装编译器g++
+sudo apt-get install g++
+以创建一个hello工程为例，打开终端，新建一个hello目录（mkdir），使用vi工具新建hello.h、hello.cpp、main.cpp、makefile四个文件。
+1. hello.h文件 
+/* 
+* hello.h 
+* 
+*  Created on: 2009-6-27 
+*      Author: young 
+*/ 
+#ifndef HELLO_H_ 
+#define HELLO_H_ 
+class Hello { 
+public: 
+void print(); 
+}; 
+#endif /* HELLO_H_ */ 
+
+2. hello.cpp文件 
+#include "hello.h" 
+#include <iostream> 
+using namespace std; 
+void Hello::print() { 
+       cout<<"Hello, welcome to Redhat Linux os!"<<endl; 
+} 
+
+3. main.cpp文件 
+#include "hello.h" 
+#include <iostream> 
+using namespace std; 
+int main() { 
+     Hello h; 
+     h.print(); 
+     return 0； 
+} 
+注意：这三个文件要以空白行结束，否则编译时会有警告信息
+4. makefile文件 
+# this is a makefile of the c++ project hello 
+# the standard c++ compiler in the Redhat linux is g++ 
+# written by young on June 27th, 2009 
+      TARGET = . 
+          CC = g++ 
+      CFLAGS = -g 
+      CFLAGC = -c 
+       
+      MAINC = main.cpp 
+      HELLO = hello.cpp 
+        OBJ = hello.o 
+       
+      INCLUDE = -I$(TARGET) 
+         EXEC = $(TARGET)/main 
+       
+all: $(EXEC) 
+$(EXEC): $(OBJ) $(MAINC) 
+$(CC) $(CFLAGS) $(OBJ) $(MAINC) $(INCLUDE) -o $@ 
+rm -f $(OBJ) 
+@echo "<<<<<< $@ is created successfully! >>>>>>" 
+$(OBJ): $(HELLO) 
+$(CC) $(CFLAGC) $(HELLO) -o $@ 
+clean: 
+rm -f $(EXEC) 
+注意： makefile文件中的命令行(红色字体)一定要以Tab建开头，否则编译通不过。
+接下来开始编译工程。在终端输入make命令，回车后将显示如下信息： 
+g++ -c hello.cpp -o hello.o 
+g++ -g hello.o main.cpp -I. -o main 
+rm -f hello.o 
+<<<<<< main is created successfully! >>>>>> 
+这些信息说明工程已被正确编译，当前目录下将生成一个main的可执行文件。 
+同样，你也可以不使用makefile文件，而直接在终端上输入以下两行命令： 
+g++ -c hello.cpp -o hello.o 
+g++ -g hello.o main.cpp -I. -o main 
+也可以编译这个工程。 
+
+使用ls -l命令查看当前目录下的所有文件，确实有一个main文件。 
+在终端中输入./main，即可运行程序。
+
+如何在Linux上执行C++调用Java的工程？
+g++ main.cpp -o test -I/usr/java/include/ -I/usr/java/include/linux -I/usr/java/jre/lib/amd64//server/ -L/usr/java/jre/lib/amd64/server/ -ljvm
+
+可用的Linux服务器和每个服务器上的代码
+	10.162.235.205   root "mEPjHXJKQ1P)"
+模拟代码ParkServer，存储路径 zhangxilai/model
+	10.162.203.95    root "dQ9W3uDt-1!("
+模拟代码CacheFacadeServer，存储路径 model
+	10.162.212.236   root "N(nTeJXZE9PO"
+模拟代码Worker，存储路径 model
+模拟代码Ctor（即总体的C++工程），存储路径 model/ctor
+模拟代码dotask_cpp（即执行子任务的C++工程），存储路径 model/dotask_cpp
+	10.162.212.177   root "B8K!z5eMOzAV"
+模拟代码CacheServer，存储路径 model
+	10.188.244.140  root  huawei@123
+/opt/home/z84105513/
+NetStarModelerCPPCBB：总的程序
+NetStarModelerCPPCBB_litetask：原来的框架
+NetStarPlannerCommonCPPCBB：基本的类
+Wdmsimprocess子程序
+Wdmsimulation主程序
+Build文件夹里面有makefile，可以编译一整个工程，但我并不需要使用这个文件
+Output文件夹里是编译完成的文件夹，com.huawei.netstar.cpp.linux.net.zip是编译后生成的整体打包文件。/linux/release/dll里面都是.so文件，/linux/release/inc里面都是生成的.h文件。
+程序步骤	需要准备的文件	机器IP
+创建jvm虚拟环境	C++总体工程	机器X
+启动CacheServer	一个Java class（IP端口信息在代码中配置） 	10.162.212.177:2000, 10.162.212.177:2001
+启动ParkServer	一个Java class，以及对应的config文件	10.162.203.95:1888，10.162.203.95:1889
+启动CacheFacadeServer	一个Java class，以及对应的config文件	10.162.235.205:1998，
+//10.162.235.205:1999
+启动Worker*2	一个Java class	10.162.212.236:2008，10.162.212.236:2009
+一个机器上两个实例，端口号需要在启动class程序时手动输入
+Ctor	创建模拟数据WordCount	一个C++总体工程，一个C++ doTask程序，一个Java jar包实现Ctor，被C++总体工程调用。	机器X
+	将data传入cache得到key[]		
+	分配任务，并将对应key传给对应worker		
+	得到worker计算结果，统计并保存进cache。		
+（验证）从cache取出结果，并输出显示，检验功能是否正常	在Java jar包内实现。	机器X
+销毁JVM，释放资源	C++总体工程	机器X
+
+Linux bash文件名自动补全：
+tab键
+
+对代码的分析：
+数据Indata_str，是string类型
+utaskShmMalloc得到key
+utaskShmSet将key和value（data）存入内存
+utaskShmGet将key和value取出内存
+
+do_survival(get data) -> sub_do_survival_analyse
+
+value-----key
+in_data------in_id_main_data			代表一个公共数据，每一个实例都需要用到一次
+tFaultCom------in_id_fault			代表一个数据集合，每一个实例要用到其中的一部分
+tsurvival_in_data-----in_id			代表把上面两个id组合起来的集合，每个实例一份。
+
+ProcNum是进程数量；totalGroupNum是任务数量。原代码是直接getMaxUseCore来获取又多少个进程数和线程数的。我现在先按照我的服务器修改代码。
+
+ 
+程序如何运行？
+在浏览器打开https://10.162.60.127:31943，登陆账号admin，登陆密码Huawei@123，进入第一个工程，选择业务规划，点击左下角的故障模拟，将故障对象site_1_site_2_1点叉，更新任务名称，开始运行。
+
+将工程编译出的.so文件，copy到60.127服务器上这个文件夹下：
+/opt/oss/Product/apps/NetStarModelerService/lib/c++，其中要注意用户权限什么的有没有调整好。通过命令ll即可查看权限。
+基础库和所有的编译so都要拷过来。
+
+如何查看日志：
+为了能查看到2级别调试日志（trace），要修改下面的文件：
+/opt/oss/Product/apps/NetStarModelerService/etc目录下，cat modeler.cfg
+把DISABLELOG = 2删除
+日志查看：
+/var/log/oss/Product/NetStarModelerService/netstarmodelerservice-174-0/log
+
+移植代码需要操作：
+两个部分需要修改：
+主程序：
+修改代码和makefile，复制config，jni.h、JNI_Do_Task.h、jni_md.h、lib????process.so、Main.class、makefile、cpp主程序文件、fourinone.jar、processcpp文件（？不需要吧，随便粘贴的可能是）。
+子程序：
+Java部分：在worker机器上需要config，fourinone jar，JNI_Do_Task.class，StartWorker.class。
+C++部分：
+子程序需要粘贴simprocess代码，更新makefile，复制jni.h、jni_md.h、JNI_Do_Task.h。
+ 
+ 表格：：、、begin
+程序步骤	需要准备的文件	机器IP
+创建jvm虚拟环境	C++总体工程	机器X
+启动CacheServer	一个Java class（IP端口信息在代码中配置） 	10.162.212.177:2000, 10.162.212.177:2001
+启动ParkServer	一个Java class，以及对应的config文件	10.162.203.95:1888，10.162.203.95:1889
+启动CacheFacadeServer	一个Java class，以及对应的config文件	10.162.235.205:1998，
+//10.162.235.205:1999
+启动Worker*2	一个Java class	10.162.212.236:2008，10.162.212.236:2009
+一个机器上两个实例，端口号需要在启动class程序时手动输入
+Ctor	创建模拟数据WordCount	一个C++总体工程，一个C++ doTask程序，一个Java jar包实现Ctor，被C++总体工程调用。	机器X
+	将data传入cache得到key[]		
+	分配任务，并将对应key传给对应worker		
+	得到worker计算结果，统计并保存进cache。		
+（验证）从cache取出结果，并输出显示，检验功能是否正常	在Java jar包内实现。	机器X
+销毁JVM，释放资源	C++总体工程	机器X
+表格：：、、end
+
+执行到JNI_CreateJavaVM就直接结束的解决方法：
+1	loading shared libraries: libjvm.so错误
+2016年10月11日 10:49:34
+阅读数：2496
+我在学习JNI Invocation时，将Ｃ文件编译成可执行文件，然后执行可执行文件，报出以下错误：
+./InvocationApi: error while loading shared libraries: libjvm.so: cannot open shared object file: No such file or directory
+•	1
+提示：不能加载libjvm.so库文件 
+解决办法： 
+(1)在系统中查找这个文件(当然要保证系统中已经有这个.so文件，只是查找路径没有设置正确而已)：
+　　sudo find / -name libjvm.so
+　　结果：
+/usr/lib/jvm/java-8-openjdk-amd64/jre/lib/amd64/server/libjvm.so
+/usr/local/java/jdk1.8.0_101/jre/lib/amd64/server/libjvm.so
+/usr/local/java/jdk1.6.0_45/jre/lib/amd64/server/libjvm.so
+•	1
+•	2
+•	3
+发现包含libjvm.so文件的路径不止一个，但是由于我编译Ｃ文件时是用的jdk是jdk1.8.0_101，所以正确的路径是：/usr/local/java/jdk1.8.0_101/jre/lib/amd64/server/libjvm.so 
+(2)将.so文件路径的目录添加到/etc/ld.so.conf
+ 　　sudo vim /etc/ld.so.conf
+•	1
+（随便一个编辑器，主要是打开/etc/ld.so.conf文件）,在文件末尾新添加一行：
+/usr/local/java/jdk1.8.0_101/jre/lib/amd64/server
+•	1
+(3)使得修改生效
+sudo /sbin/ldconfig
+•	1
+这样就不会有那个找不对.so文件的错误啦。
+
+
+
+首先，fourinone原来的jar和我修改的jar
+其次，project修改后的，project原来的副本
+再次，模拟代码程序两个c++一个Java
+最后，每个东西是干嘛的，做个简单介绍txt
