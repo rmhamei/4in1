@@ -1,0 +1,6 @@
+启动ParkServerDemo
+Java -cp fourinone.jar: ParkServerDemo
+运行 一个到多个WorkcountWK
+Java -cp fourinone.jar: WordcountWK 2008
+运行WordcountCT，传入文件路径
+Java -cp fourinone.jar: WordcountCT inputdata.txt
