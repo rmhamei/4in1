@@ -1,0 +1,198 @@
+//图片粘不过来，看pdf吧
+
+Demo1 一个简单的实示例
+用最简单的代码示范fourinone如何进行分布式计算。了解最简单的计算过程。了解三种角色：工头（SimpleCtor）、工人（Simple Worker）、职介所（Park Server Demo）3个角色。
+函数：giveTask、doTask、getWaitingWorkers、waitWorking
+
+Demo2 工头工人计算更完整的示例
+现实中，分布式计算存在多个环节，比如有的任务拆分，有的计算结果合并，或者多个拆分和合并，它们之间是串行关系，也就是合并必须等待拆分和计算才能进行，同时每个拆分或者合并的任务又都是并行的过程。即，工头串行、工人并行。
+函数：giveTask、doTask、getWaitingWorkers、waitWorking
+toNext
+
+Demo3 工人合并互相say hello的示例
+本demo演示了工头和几个工人之间互相sayhello的简单例子，从而了解到集群计算节点之间互相交互，以及工头批量处理和工人互相传递数据（多用于合并）的功能。
+函数：giveTask、doTask、getWaitingWorkers、waitWorking
+doTaskBatch、receive、getWorkerElse
+注：什么叫做批量的完成？？
+从workers[i].doTask(WareHouse)转换为doTaskBatch(workers, WareHouse)，参数表示工人集合和任务。该方法会等到每个工人都执行完该任务才返回，因此使用doTaskBatch不需要轮循检查每一个调用结果，他是一个批量处理。为了节省资源利用，工头运行结束后不会退出jvm，可以使用exit方法强行退出。
+总结：
+实际上，工头对工人的调用是通过doTask，工人对工人的调用是通过receive。doTask用于工头分配任务，receive多用于工人之间合并传递数据，每个工人都可以同时向其他工人传递数据，并接收来自其他工人的数据。集群中每个工人向其他工人传递数据都完成了，也就意味着每个工人都接收完成了。
+
+Demo4 实现Hadoop经典实例Word Count
+该demo演示了Hadoop的经典实例Word Count的实现。
+输入数据：n个数据文件，每个1G大小，为了方便统计，每个文件的数据由“aaa bbb … ccc”（由空格分割的1k单词组）不断复制组成。
+输出数据：输出这n*1G个数据文件中的每个单词总数。
+Fourinone简单实现思路：假设有n台计算机，将这n个1G数据文件放置在每台计算机上，每台计算机各自统计1G数据，然后合并得到结果。
+函数：giveTask、getWaitingWorkers、doTaskBatch、doTask
+
+Demo5 分布式多机部署的示例
+在前面的分布式计算上手demo、分布式计算say hello、分布式计算完整demo中，对于工人（worker）、工头（ctor）、parkserver在多台计算机上的部署和配置。
+关于config文件：工人、工头、parkserver都需要配置park的ip（park ip还可以设置备用ip）；工人需要配置自己的工人ip（或者在程序里配置ip）；其余不需要配置。
+可用的Linux服务器
+10.162.203.95    root "dQ9W3uDt-1!("	parkserver
+10.162.212.177   root "B8K!z5eMOzAV"	worker1
+10.162.212.236   root "N(nTeJXZE9PO"	worker2
+10.162.235.205   root "mEPjHXJKQ1P)"	ctor
+注：linux下执行Java文件： java –classpath fourinone.jar: SimpleDemo
+
+Demo6 分布式计算自动部署的示例
+如果不需要自动部署，将工头、工人程序文件分别部署到响应及其运行即可，不需要过多配置。
+Fourinone可以支持自动化class和jar包部署，class和jar包只需放在工头机器上，各工人机器会自动获取并执行，兼容操作系统，不需要进行安全密钥复杂配置。
+如果需要自动部署，可以将上面三个class文件都放置在工头机器上，并在工头实现里指定工人实现类。在JobCtor里面通过下面代码设置：
+wks[0].setWorker(new JobWorker());
+
+Demo7 计算过程中的故障和容灾处理
+Fourinone不会抛弃错误不出来或者容忍错误。框架通常捕获所有错误反馈给开发者去处理，但是框架本身不自作主张，替开发者考虑处理方案。
+并行计算中：
+框架关注的故障：系统故障引起的中断（宕机和网络故障）；
+业务逻辑开发者：业务逻辑意义上的错误数据。
+系统故障导致网络断掉或者宕机，框架会捕获故障信息并通告，工头在检验工人执行状态时会获知，并进行相应的业务上的故障处理，比如重发或者单独记录日志。业务逻辑意义上的错误数据，通常在工人的业务实现逻辑里去判断，比如计算结果的金额为负数是一个不符合业务要求的错误数据，这个是由开发者去控制，框架不做业务逻辑上的错误处理。
+注：在工头Ctor判断返回状态是否异常的while循环中，要加上try{Thread.sleep(1L);}catch (Exception ex){}，这样有停顿，才能获知错误并显示。
+框架如何容灾？
+工头：
+工头是嵌入式的，不是一个服务程序，不存在恢复和容灾的概念。但如果嵌入工头的系统是一个定时执行的计算任务时，也许要考虑容灾，因为涉及单点问题，可以让两个工头竞争一个分布式锁实现。
+工人和职介所：
+工人节点故障，职介所会实时感知，工头分配计算时会获取到最新活跃工人数量。
+如果职介所节点故障，fourinone实现了领导者选举机制，会实时切换到备份职介所上。
+如果工人在计算过程中发生故障，框架会进行截获，然后提前返回计算结果，并设置结果的状态为异常。
+也就是正常完成计算时：result.getStatus()==WareHouse.READY
+计算过程发生故障中断时：result.getStatus()==WareHouse.EXCEPTION
+这样工头就可以根据检查结果的状态，来做故障时的容灾处理。
+注：也可以在工人的doTask实现方法内部捕捉业务异常，由开发者根据程序实现自由决定。
+
+Demo8 分机运行word count 进行压力测试
+把Demo5的Word Count运行压力测试，实现：1.分机部署；2.每台机器各600M的测试文件。
+注：文件inputdata.txt应该放在Worker（WordcountWK）的相对路径下。而在Ctor（WordcountCT）运行的时候输入相对路径。
+
+Demo9 计算过程中的相关时间属性设置
+如果ParkServer窗口出现“INFO: _worker_faultWorker.13D7C5BDC9A-11FF07AC4566 cant be deleted or not exist!”的信息，并不是框架出故障了，而是表明：您的工人当前太繁忙了，无法按照跟职介所约定的心跳时间保持联系，职介所长时间没有收到该名工人的联系，认为他已经不活跃了，将其从活跃的工人列表中删除，于是出现上面的信息。
+不过，职介所将工人从活跃列表删除，并不影响本次计算，因为职介所将工人介绍给包工头后，计算过程中是包工头和工人直接交互，不再依赖职介所。受影响的是下次计算时，包工头再次到职介所获取工人时，职介所不会再推荐该名工人了。
+Heartbeat心跳时间设置：config.xml（默认配置3000毫秒）
+<HEARTBEAT>3000</HEARTBEAT>
+<MAXDELAY>0</MAXDELAY>
+注：如果工人、职介所、包工头在不同机器上，需要将各自的配置文件的HEARTBEAT配置为一致。
+MAXDELAY是抢救期间，在抢救期间可以从parkserver上面看到信息“WARNING: _worker_faultworker、13D80B483C2-697540AA5E1 slow and weak heartbeat!”
+配置MAXDELAY抢救时间，既避免工人计算繁忙时跟职介所失去联系，也可以避免集群状态感知的太长时间延迟。
+
+Demo10 如何在一台计算机上一次性启动多个进程
+不用手动启动多个工人或进程。用一台机器一次性启动多个进程，完成say hello代码任务，并将日志输出保存。
+串行启动进程：BeanContext.start()；
+并行启动进程：BeanContext.tryStart()；
+如果一个进程是服务监听的，它启动后就会一直堵塞，startResult的状态一直为NOTREADY（进程运行中），所以一个服务化进程启动后不能通过StartResult的状态为READY来判断他是否启动完成。可以根据进程启动耗时设置一个等待时间等待他启动就绪。
+杀死进程：kill（返回完成状态）；
+超时杀死进程：public int getStatus(long timeout)，timeout为毫秒数。在获取状态时，传入一个超时时间去比对判断是否超时，如果超时那么会自动杀死该进程，并返回异常状态；
+注意：start和tryStart使用非常灵活，可以启动任何进程脚本命令或者批处理命令，但是需要注意父子进程的关系，这里只能杀死父进程，但是杀不了由父进程启动的子进程，比如启动了一个cmd.bat的批处理命令，如果使用kill中止，只能杀死cmd.bat这个进程本身，但是无法杀死在这个批处理中启动过多其他进程。因此，如果需要使用kill，最好不要有进程嵌套启动，请转换为一个个单独进程启动。
+输出进程运行的日志信息：public void print(String logpath)（其中logpath为文件路径，可以是绝对路径，也可以是相对路径）（tryStart的单独异步方式输出）
+如果采用start启动进程，默认在系统窗口输出日志，因为串行，所以可以先后输出日志，不存在冲突。如果采用tryStart，是并行，同时执行，如果都在窗口输出日志，存在冲突，因此默认不输出。
+注：对于批处理命令，也可以在启动时通过加入”>>”参数方式输出日志，比如：tryStart(“build.bat”, “>>log\park.log”, “2>>&1”)，但是这种方式不是所有情况都适合，如果是启动java或者javac这样的命令使用”>>”，会被当成一个普通的Java输入参数，而不会被shell识别为重定向输出，因为java不是.bat批处理命令，无法启动shell环境。
+问题：如何在config.xml中设置多个worker的ip地址？
+
+Demo11 分布式缓存demo（小型网站或企业应用的缓存实现架构）
+直接启动一个ParkServer，分别在两个Java进程中使用ParkLocal的create和get方法即可实现缓存的读写操作。
+但是对于大型互联网应用，高峰访问量上百万的并发读写吞吐量，会超出单台服务器的承受能力，需要改进上面设计，考虑解决负载和扩容的问题。
+大型网站的缓存，单台ParkServer的压力不能承受，需要建立多台CacheServer，并使用CacheFacade进行负载均衡。CacheFacade会根据key自动寻找存储它的CacheServer，数据在多台CacheServer上是均匀分布的。每台CacheServer都可以有自己的备份服务器，出现故障可几乎实时切换到备份服务器处理请求。
+ 
+利用硬件负载均衡路由到一组Facade服务器上，，Facade自动为缓存内容生成key，并根据key准确找到缓存集群中的哪台服务器。当缓存服务器容量到达限制，可自由扩容，不需要成倍扩容。Facade算法会登记服务器扩容时间版本，并将key智能地和这个时间匹配，这样扩容之后还能准确找到之前分配到的服务器。
+在物理上，每个FacadeServer独立部署在一台计算机服务器上。在物理上，每个CacheServer主备独立部署一台计算机服务器。
+问题：在执行CacheFacade时，在win平台上没有问题，在Linux平台上有异常。
+注意：
+每个CacheServer、ParkServer、CacheFacade必须在物理上独自享有一台机器。否则会出现地址被占用的报错；
+关于CacheFacade的配置，config.xml中，应该注意CACHEGROUP所对应的starttime日期。只有在日期范围内的CacheGroup中的server会被调用；
+如果有多个CacheFacade，要保持所有config.xml的CACHEGROUP信息一致；
+对于Linux平台，config.xml中的日期格式改为“YYYYMMDD”，否则会抛出异常。而Win平台上，保持原本的“YYYY-MM-DD”格式即可；
+如果cachePutDemo在执行过程中因为个人操作出现错误，应当重启所有Server重新部署，否则cacheGetDemo将一直得不到结果；（很有可能是因为缓存未清空）
+强行中断CacheFacadeServer之后，不能直接再次执行CacheFacadeDemo，否则会出现address被占用的情况。必须重启所有server窗口。
+	CacheFacadeDemo的Config中的参数配置如下：
+<PROPSROW DESC="CACHEGROUP"><STARTTIME>20100101</STARTTIME><GROUP>localhost:2008,localhost:2009@20100101;localhost:2010,localhost:2011@20100501</GROUP></PROPSROW><PROPSROW DESC="CACHEGROUP"><STARTTIME>20180501</STARTTIME><GROUP>10.162.212.177:2000,10.162.212.177:2001@20180501;10.162.212.236:2002,10.162.212.236:2003@20180501</GROUP></PROPSROW><PROPSROW DESC="CACHEFACADE"><SERVICE>CacheFacadeService</SERVICE><SERVERS>localhost:1999</SERVERS><TRYKEYSNUM>100</TRYKEYSNUM></PROPSROW>
+其中，参数CACHEGROUP的含义：主设备IP：端口，备用设备IP：端口@加入集群的时间；主设备IP：端口，备用设备IP：端口@加入集群的时间
+	ParkServerDemo的参数配置如下：
+<PROPSROW DESC="CACHEGROUP"><STARTTIME>20100101</STARTTIME><GROUP>10.162.212.177:2000,10.162.212.177:2001@20100101;10.162.212.236:2002,10.162.212.236:2003@20100501</GROUP></PROPSROW><PROPSROW DESC="CACHEGROUP"><STARTTIME>20180501</STARTTIME><GROUP>localhost:2008,localhost:2009@20180501;localhost:2010,localhost:2011@20180501</GROUP></PROPSROW><PROPSROW DESC="CACHEFACADE"><SERVICE>CacheFacadeService</SERVICE><SERVERS>localhost:1998</SERVERS><TRYKEYSNUM>100</TRYKEYSNUM></PROPSROW>
+
+Demo12 一致性哈希算法的原理、改进和实现
+重点：分布式的负载均衡
+简陋：按机器数量取模。为了保证扩容后不出问题，往往采用成倍扩容的方式解决，但很容易造成机器资源浪费。
+常识：服务器的key、数据的key，通常是“数据内容”、“服务器编号或者IP”，通过哈希函数得到。
+要考虑的问题情况：故障、扩容、集群服务器分布不均。
+一致性哈希算法是常用的算法，但是fourinone没有采用。Fourinone采用的是一种基于日期key取模的方式。基于日期分组策略实现扩容后数据分布均匀，也能达到目的和解决问题。
+
+Demo13 解决任意扩容的问题
+相关：config.xml的CACHEGROUP参数。
+ 
+对于一个新生成的key，它的时间是当前的时间，也就是会覆盖集群中所有的计算机，因为计算机加入集群的时间是一个过去时。
+
+Demo14 解决扩容后数据均匀问题
+希望保证数据分布均匀，让新的数据更多的散落到新扩容的机器上存储，减少已有集群机器的存储压力，在Fourinone中是采用日期分组策略完成的。
+问题：日期时间信息冲突怎么办？如果数据key的时间和服务器扩容的市价出现冲突怎么办？按日期时间取模方式会不会出问题？
+答：实际上在集群负责的场景下有个特点，就是服务器的扩容时间是粗粒度的，他不需要也不会精确到秒，因为服务器不会每秒都扩容，一般一年、半年才扩容一次；而数据key的时间是一个细粒度的，因此很准确就能匹配到属于哪个粗粒度的时间范围，而不会发生冲突。
+
+Demo15 分布式Session的架构设计和实现
+ 
+详见pdf
+服务器查询上的优势：
+当浏览器将Cookie里的key信息携带发出请求时，FacadeServer并不需要根据key去一个配置服务器查询关联到哪台存储服务器，因为当请求量很大时，配置服务器的查询会成为瓶颈，并且传统的key取模方式有很大的缺陷，比如对于集群数量为n，那么数字ID的key，按照key%n得到路由的目标计算机，当集群数量扩充时，取模变得不准确，通常需要成倍去扩容，这会造成成本增加和浪费。这里采用前面讲述的日期取模算法，将含有日期信息的key和集群配置的日期匹配计算出覆盖范围的机器数，再以取模的方式得到负载的计算机，对于集群的任意数量的扩容都不会受到影响。
+Demo16 缓存容量的相关属性设置、缓存清空的相关属性设置
+SAFEMEMORYPER配置项，内存占用安全比率，默认0.95。如果超出该比率，将无法正确写入，会返回null，并且系统会提示写入错误，但是不会抛出系统异常。这个安全占用比率的设置是为了避免发生OutOfMemory造成系统崩溃。
+不断写入数据，超过内存占用安全比率后，界面会输出“The capacity close to out of memory, please clear out some data！”这个时候写入数据不成功，返回null值。
+对于我们写入的domain、node和value的键值数据，可以匹配一个过期时间，过期后框架会自动进行清空，并且清空也可以设置一个周期，每隔一段时间清一次过期的数据。（估计是因为这个原因，才导致前面在CachePutDemo操作失误一次之后，再也得不到正确的结果）
+在config.xml的Park部分：
+EXPIRATION：代表节点的过期时间，单位为小时，默认值是24；
+CLEARPERIOD：代表清空的周期时间，单位为小时，默认为0（表示不清空）。
+<EXPIRATION>0.02</EXPIRATION>
+<CLEARPERIOD>0.01</CLEARPERIOD>
+EXPIRATION：0.02*60*60=72秒，表示写入的节点数据在72秒后过期。
+CLEARPERIOD：0.01*60*60=36秒，表示每隔36秒清空一次过期的数据。
+对于有heartbeat的“心跳”节点，它没有时间过期的概念而不会被框架自动清空。
+
+Demo17 统一配置管理demo
+在分布式多台机器的环境下，维持同意的配置信息是最常见的需求，当配置信息改变时，所有的机器能实时获取并更新。操作包括修改节点信息，GetConfig能立即获取到新的更新；当ParkMasterServer宕机，ParkSlaveServer仍可以为GetConfig程序提供需要的信息。
+
+Demo18 分布式锁Demo
+分布式锁可以让多个分布式应用依照先后顺序保持一致性操作。生成一个节点，domain为lock，node为node。如果node是自己的node就执行，不然就等待。执行完删除自己的node，代表释放锁。
+
+Demo19 集群管理demo
+需要一个集群管理者管理集群里的服务器，同一个集群中任何一台服务器宕机，其他服务器都能感知。如果是集群管理者宕机，集群中所有的服务器不能受任何影响，能实时切换到备份管理者上提供服务。
+pl.create(“group”, args[0], args[0], AuthPolicy.OP_ALL, true);
+前三个参数为domain、node、value，AuthPolicy.OP_ALL表示该节点的权限为公共，也就是可以被其他进程修改删除。True代表它是个保持连接节点，如果失去连接，该节点会被删除。
+
+Demo20 领导者选举相关属性设置
+Config.xml中park的部分配置里，
+<SERVERS>localhost:1888,localhost:1889</SERVERS>
+<ALWAYSTRYLEADER>false</ALWAYSTRYLEADER>
+其中，ALWAYSTRYLEADER默认false，表示一直进行领导者寻找，如果集群中没有领导者，也没有候选者替补，应用程序会根据配置I型逆袭一直寻找并等待下去，直到最后找到。如果是true，则在寻找一轮之后便放弃。
+
+Demo21 计算中止Demo
+如果我们需要定义一个计算时间，超时便中止计算，可以通过四种方法完成：
+方法一：工头分配完任务后开始看时间，超时便指挥各工人停止
+工头自行检查超时，工头在调用doTask时开始计时，每次轮询结果时检查是否超时，超时便调用interrupt通知工人进行中止。
+方法二：工头要求工人自觉，工人自己看时间，超时自觉停止
+工人自行检查超时，在工人的doTask实现逻辑里加入计时检查，如果超时便退出返回结果（注意和方法三的区别）。
+方法三：框架调用超时抛异常方式
+工人不自行检查超时，框架检查到工人doTask计算超时抛出系统异常，中断任务调用。如果要使用该方式，请将配置文件config.xml中：
+<PROPSROW DESC="WORKER">
+<TIMEOUT DESC="FALSE">2</TIMEOUT>
+</PROPSROW>
+TIMEOUT DESC设置为TRUE，2表示超时时间，小时为单位，这里默认是2小时，也就是如果工人执行doTask超过2小时仍未完成，框架放弃调用，抛出系统异常。
+方法四：doTask的interrupt方式
+为了方便超时中止，框架也提供了一个便利方法：
+public WareHouse doTask(WareHouse inhouse, long timeoutseconds);
+也就是在调用doTask时，可以传入一个超时时间参数（秒为单位），它的实际效果就相当于doTask+interrupt，超时自动调用interrupt请求工人中止。
+
+
+总结
+Fourinone的优势：
+1.	Fourinone在数据源已经分发好的情况下，使用自身提供的高速文件IO FileAdapter可以更高效的处理大数据量文件。
+2.	Fourinone框架实现更加自由，不需要学习复杂的编程模型，能够更快速高效的解决问题。
+3.	Fourinone框架还提供了分布式缓存、MQ等功能，可以更大程度上优化程序设计与性能。
+4.	Fourinone可以实现单机多实例场景，最大程度上挖掘单机能力，无需大量机器集群。但是单机多实例情况之下，不推荐在满负荷（CPU n processor = n instance）情况下长时间运行，非fourinone框架原因。
+5.	Fourinone框架开发自由度很大，很灵活，编程上手简单，不需要学习Map/Reduce之类的复杂编程模型，非常易于编写分布式计算程序。
+
+Fourinone的不足：
+1.	Fourinone框架几乎没有容错功能，例如，无法处理节点物理down掉的情况，无法感知某个节点磁盘满，无法写入等情况；同时，fourinone框架也没有监控功能，所有这些均要依赖开发者的设计与编码质量。
+2.	Fourinone在集群部署方面无法提供像Hadoop那样的由框架完成计算代码到各个节点的分发，不过，可以通过便携部署脚本来实现。
+3.	Fourinone适合线下较小规模集群的分布式计算，实现自由，搭建方便，但是由于框架几乎不提供容错、监控等功能，所有在适用范围上有一定的局限。
+
+作者回应不足：
+1.	Fourinone框架不会在设计中抛弃错误不处理或者容忍错误导致框架崩溃，框架通常会捕获所有的错误反馈给开发者去处理，但是框架本身不提开发者考虑处理方案，只这样的框架才能从具体产品中抽象处理，给开发者更灵活的发挥和去满足各种更复杂业务容错情况。
+2.	否日你哦呢框架提供多环节链式处理支持监控过程，通过可编程的监控方式，给予业务开发方最大灵活的监控需求实现，为追求高性能不输出大量系统监控log。Hadoop单机会输出较多的系统监控log，如map和reduce百分比等，这样的系统监控会牺牲性能，也会使框架更复杂笨重，同时反馈不了真正有参考价值的业务数据监控，为了追求一个最轻巧精简的框架，所有在设计时权衡放弃，但是通用的监控管理功能后续版本会考虑提供。
+3.	Fourinone框架自动部署目前是通过脚本工具提供便利，后续版本会提供jar包或者类文件自动部署到集群中，并且实践原理跟hadoop依赖linux系统脚本不一样，不需要进行复杂shh和公钥证书配置，真正做到傻瓜化并且支持windows。
+4.	除非一个框架本身就是为了解决小型应用而设计，否则不一定体积大的软件才适合解决重大复（重量级的、大型的、复杂的）场景，实际上mysql、jboss这样传统式被认为适合小型应用的开源软件在淘宝世界级的复杂业务和数据规模下都能很好应用。Fourinone只做俄罗斯套娃中最小的一个，开发者可以去细细体会，并扩充更多的精彩。
